@@ -1,8 +1,6 @@
 
-
-import numpy as np
-import pandas as pd
 cimport cython
+import numpy as np
 cimport numpy as np
 
 

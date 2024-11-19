@@ -1,0 +1,9 @@
+MANIFEST.in
+README.md
+setup.py
+cythonized_ta/cython_ta_funcs.c
+cythonized_ta.egg-info/PKG-INFO
+cythonized_ta.egg-info/SOURCES.txt
+cythonized_ta.egg-info/dependency_links.txt
+cythonized_ta.egg-info/requires.txt
+cythonized_ta.egg-info/top_level.txt

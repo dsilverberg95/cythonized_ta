@@ -1,0 +1,2 @@
+exclude cythonized_ta/*.pyx
+include cythonized_ta/*.c

@@ -3,6 +3,7 @@ cimport cython
 import numpy as np
 cimport numpy as np
 
+# cython: np_pythran=True
 
 def cython_sma(np.ndarray[np.float32_t, ndim=1] input_array, int timeperiod, bint normalize=True, int n_values = 999999999):
     cdef int n = len(input_array), i, non_nan_count = 0
@@ -10,33 +11,37 @@ def cython_sma(np.ndarray[np.float32_t, ndim=1] input_array, int timeperiod, bin
     cdef float sum = 0.0
     k = max(timeperiod - 1, n - n_values)
     for i in range(k - timeperiod, k):
-        if not np.isnan(input_array[i]):
-            sum += input_array[i]
+        value = input_array[i]
+        if not np.isnan(value):
+            sum += value
             non_nan_count += 1
     if normalize:
         for i in range(k, n):
-            if not np.isnan(input_array[i]):
-                sum += input_array[i]
+            new = input_array[i]
+            old = input_array[i - timeperiod]
+            if not np.isnan(new):
+                sum += new
                 non_nan_count += 1
-            if not np.isnan(input_array[i - timeperiod]):
-                sum -= input_array[i - timeperiod]
+            if not np.isnan(old):
+                sum -= old
                 non_nan_count -= 1
             if non_nan_count > 0:
-                sma[i] = ((sum / non_nan_count) - input_array[i]) / input_array[i]                    
+                sma[i] = ((sum / non_nan_count) - new) / (new if new!=0 else 1e-9)     
     else:
         for i in range(k, n):
-            if not np.isnan(input_array[i]):
-                sum += input_array[i]
+            new = input_array[i]
+            old = input_array[i - timeperiod]
+            if not np.isnan(new):
+                sum += new
                 non_nan_count += 1
-            if not np.isnan(input_array[i - timeperiod]):
-                sum -= input_array[i - timeperiod]
+            if not np.isnan(old):
+                sum -= old
                 non_nan_count -= 1
             if non_nan_count > 0:
                 sma[i] = sum / non_nan_count
     del input_array
     return sma
         
-
 
 def cython_lin(np.ndarray[np.float32_t, ndim=1] input_array, int timeperiod, int n_values = 999999999):
     cdef int n = len(input_array), i, j, first_non_nan_index = -1, start_index
@@ -138,12 +143,14 @@ def cython_ema(np.ndarray[np.float32_t, ndim=1] input_array, int timeperiod, bin
             for i in range(first_non_nan + 1, n - n_values):
                 ema_value = alpha * input_array[i] + (1 - alpha) * ema_value
             for i in range(n - n_values, n):
-                ema_value = alpha * input_array[i] + (1 - alpha) * ema_value
-                ema[i] = (ema_value - input_array[i]) / input_array[i]
+                new = input_array[i]
+                ema_value = alpha * new + (1 - alpha) * ema_value
+                ema[i] = (ema_value - new) / new
         else:
             for i in range(first_non_nan, n):
-                ema_value = alpha * input_array[i] + (1 - alpha) * ema_value
-                ema[i] = (ema_value - input_array[i]) / input_array[i]
+                new = input_array[i]
+                ema_value = alpha * new + (1 - alpha) * ema_value
+                ema[i] = (ema_value - new) / new
     else:
         if first_non_nan < n - n_values:
             for i in range(first_non_nan + 1, n - n_values):
@@ -282,13 +289,21 @@ def cython_trix(np.ndarray[np.float32_t, ndim=1] arr, int timeperiod = 1, bint i
 
 
 
-def cython_roc(np.ndarray[np.float32_t, ndim=1] input_array, int timeperiod, int n_values = 999999999):
+def cython_roc(np.ndarray[np.float32_t, ndim=1] input_array, int timeperiod, int n_values=999999999):
     cdef int n = len(input_array)
+    cdef int k = max(n - n_values, timeperiod)
     cdef np.ndarray[np.float32_t, ndim=1] roc = np.full(n, np.nan, dtype=np.float32)
-    k = max(n - n_values, timeperiod)
-    for i in range(k, n):
-        roc[i] = (input_array[i] - input_array[i - timeperiod]) / (input_array[i - timeperiod] + (0 if input_array[i - timeperiod]!=0 else 1e-9))
-    del input_array
+
+    # Vectorized computation for indices from k to n
+    if k < n:
+        # Extract the relevant slices
+        current_values = input_array[k:]
+        previous_values = input_array[k - timeperiod:n - timeperiod]
+        
+        # Compute ROC using NumPy's vectorized operations
+        prev_nonzero = np.where(previous_values != 0, previous_values, 1e-9)
+        roc[k:] = (input_array[k:] - previous_values) / prev_nonzero
+
     return roc
 
  

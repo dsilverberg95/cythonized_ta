@@ -1,27 +1,31 @@
-from setuptools import setup, Extension
+from setuptools import setup, find_packages, Extension
 from Cython.Build import cythonize
 import numpy
-import os
 
-# Check if we're in a development environment
-use_cython = os.path.exists("cythonized_ta/cython_ta_funcs.pyx")
-
-# Choose the appropriate file extension
-ext = "pyx" if use_cython else "c"
+# Define the Cython extensions
 extensions = [
     Extension(
-        "cythonized_ta.cython_ta_funcs",
-        [f"cythonized_ta/cython_ta_funcs.{ext}"],
-        include_dirs=[numpy.get_include()],
+        "cythonized_ta.cython_ta_funcs",  # Extension module name
+        ["cythonized_ta/cython_ta_funcs.pyx"],  # Path to the .pyx file
+        include_dirs=[numpy.get_include()],  # Include NumPy headers
         define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
     )
 ]
 
+# Setup configuration
 setup(
-    name="cythonized_ta",
-    ext_modules=cythonize(extensions) if use_cython else extensions,
-    install_requires=[
-        "Cython" if use_cython else "numpy",
-        "numpy"
+    name="cythonized-ta",  # Distribution name (for pip)
+    version="0.1.0",  # Package version
+    description="A Cython-optimized library for technical analysis functions",
+    author="Your Name",
+    packages=find_packages(),  # Automatically find and include the Python package
+    ext_modules=cythonize(extensions),  # Always Cythonize the extensions
+    install_requires=["numpy", "Cython"],  # Dependencies
+    classifiers=[
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Cython",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: OS Independent",
     ],
+    python_requires=">=3.7",  # Minimum Python version
 )

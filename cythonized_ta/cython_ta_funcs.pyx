@@ -5,37 +5,36 @@ cimport numpy as np
 
 # cython: np_pythran=True
 
-def cython_sma(np.ndarray[np.float32_t, ndim=1] input_array, int timeperiod, bint normalize=True, int n_values = 999999999):
+
+def new_sma(np.ndarray[np.float32_t, ndim=1] input_array, int timeperiod, bint normalize=True, int n_values = 999999999):
     cdef int n = len(input_array), i, non_nan_count = 0
     cdef np.ndarray[np.float32_t, ndim=1] sma = np.full(n, np.nan, dtype=np.float32)
+    cdef np.ndarray[np.uint8_t, ndim = 1, cast=True] non_nan_mask = ~np.isnan(input_array)
     cdef float sum = 0.0
     k = max(timeperiod - 1, n - n_values)
     for i in range(k - timeperiod, k):
-        value = input_array[i]
-        if not np.isnan(value):
-            sum += value
+        if non_nan_mask[i]:
+            sum += input_array[i]
             non_nan_count += 1
     if normalize:
         for i in range(k, n):
             new = input_array[i]
-            old = input_array[i - timeperiod]
-            if not np.isnan(new):
+            if non_nan_mask[i]:
                 sum += new
                 non_nan_count += 1
-            if not np.isnan(old):
-                sum -= old
+            if non_nan_mask[i - timeperiod]:
+                sum -= input_array[i - timeperiod]
                 non_nan_count -= 1
             if non_nan_count > 0:
                 sma[i] = ((sum / non_nan_count) - new) / (new if new!=0 else 1e-9)     
     else:
         for i in range(k, n):
             new = input_array[i]
-            old = input_array[i - timeperiod]
-            if not np.isnan(new):
+            if non_nan_mask[i]:
                 sum += new
                 non_nan_count += 1
-            if not np.isnan(old):
-                sum -= old
+            if non_nan_mask[i - timeperiod]:
+                sum -= input_array[i - timeperiod]
                 non_nan_count -= 1
             if non_nan_count > 0:
                 sma[i] = sum / non_nan_count

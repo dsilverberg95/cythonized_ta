@@ -1,4 +1,3 @@
-
 cimport cython
 import numpy as np
 cimport numpy as np
@@ -6,7 +5,7 @@ cimport numpy as np
 # cython: np_pythran=True
 
 
-def sma(np.ndarray[np.float32_t, ndim=1] input_array, int timeperiod, bint normalize=True, int n_values = 999999999):
+def sma(np.ndarray[np.float32_t, ndim=1] input_array = None, int timeperiod = 2, bint normalize=True, int n_values = 999999999):
     """
     Calculate the Simple Moving Average (SMA) over a specified time period.
 
@@ -117,7 +116,7 @@ def sma(np.ndarray[np.float32_t, ndim=1] input_array, int timeperiod, bint norma
     return sma
 
 
-def linreg_slope(np.ndarray[np.float32_t, ndim=1] input_array, int timeperiod, int n_values = 999999999):
+def linreg_slope(np.ndarray[np.float32_t, ndim=1] input_array = None, int timeperiod = 1, int n_values = 999999999):
     """
     Calculate the slope of a linear regression line over a specified time period.
 
@@ -188,12 +187,12 @@ def linreg_slope(np.ndarray[np.float32_t, ndim=1] input_array, int timeperiod, i
 
 
 
-def midpoint(np.ndarray[np.float32_t, ndim=1] high, np.ndarray[np.float32_t, ndim=1] low, np.ndarray[np.float32_t, ndim=1] close, int timeperiod, bint normalize=True, int n_values = 999999999):
+def midpoint(np.ndarray[np.float32_t, ndim=1] high = None, np.ndarray[np.float32_t, ndim=1] low = None, np.ndarray[np.float32_t, ndim=1] close = None, int timeperiod = 1, bint normalize=True, int n_values = 999999999):
     """
     Calculate the midpoint of the high and low prices over a specified time period.
 
     The midpoint is a simple average of the highest high and lowest low within the lookback period. 
-    It can be normalized relative to the closing price to measure deviation.
+    It can be normalized relative to the closing price to measure its relative deviation.
 
     Parameters:
     ----------
@@ -248,6 +247,7 @@ def midpoint(np.ndarray[np.float32_t, ndim=1] high, np.ndarray[np.float32_t, ndi
         low_end += 1
     if normalize:
         for i in range(k, n):
+            new_close = close[i]
             if high_end > high_start and high_indices[high_start] <= i - timeperiod:
                 high_start += 1
             if low_end > low_start and low_indices[low_start] <= i - timeperiod:
@@ -260,7 +260,7 @@ def midpoint(np.ndarray[np.float32_t, ndim=1] high, np.ndarray[np.float32_t, ndi
                 low_end -= 1
             low_indices[low_end] = i
             low_end += 1
-            mid[i] = ((low[low_indices[low_start]] + (high[high_indices[high_start]] - low[low_indices[low_start]]) / 2) - close[i]) / close[i]
+            mid[i] = ((low[low_indices[low_start]] + (high[high_indices[high_start]] - low[low_indices[low_start]]) / 2) - new_close) / (new_close if new_close!=0 else 1e-9) 
     else:
         for i in range(k, n):
             if high_end > high_start and high_indices[high_start] <= i - timeperiod:
@@ -281,7 +281,7 @@ def midpoint(np.ndarray[np.float32_t, ndim=1] high, np.ndarray[np.float32_t, ndi
 
  
 
-def ema(np.ndarray[np.float32_t, ndim=1] input_array, int timeperiod, bint normalize=True, int n_values = 999999999):
+def ema(np.ndarray[np.float32_t, ndim=1] input_array = None, int timeperiod = 1, bint normalize=True, int n_values = 999999999):
     """
     Calculate the Exponential Moving Average (EMA) over a specified time period.
 
@@ -340,12 +340,12 @@ def ema(np.ndarray[np.float32_t, ndim=1] input_array, int timeperiod, bint norma
             for i in range(n - n_values, n):
                 new = input_array[i]
                 ema_value = alpha * new + (1 - alpha) * ema_value
-                ema[i] = (ema_value - new) / new
+                ema[i] = (ema_value - new) / (new if new!=0 else 1e-9) 
         else:
             for i in range(first_non_nan, n):
                 new = input_array[i]
                 ema_value = alpha * new + (1 - alpha) * ema_value
-                ema[i] = (ema_value - new) / new
+                ema[i] = (ema_value - new) / (new if new!=0 else 1e-9) 
     else:
         if first_non_nan < n - n_values:
             for i in range(first_non_nan + 1, n - n_values):
@@ -362,7 +362,7 @@ def ema(np.ndarray[np.float32_t, ndim=1] input_array, int timeperiod, bint norma
 
 
 
-def ema2(np.ndarray[np.float32_t, ndim=1] input_array, int timeperiod, bint input_is_ema1=False, int n_values=999999999):
+def ema2(np.ndarray[np.float32_t, ndim=1] input_array = None, int timeperiod = 1, bint input_is_ema1=False, int n_values=999999999):
     """
     Calculate the second-level Exponential Moving Average (EMA2) over a specified time period.
 
@@ -399,17 +399,17 @@ def ema2(np.ndarray[np.float32_t, ndim=1] input_array, int timeperiod, bint inpu
     """    
     cdef np.ndarray[np.float32_t, ndim=1] ema1, ema2
     if input_is_ema1:
-        ema2 = cython_ema(input_array, timeperiod, normalize=False, n_values=n_values)
+        ema2 = ema(input_array, timeperiod, normalize=False, n_values=n_values)
     else:
-        ema1 = cython_ema(input_array, timeperiod, normalize=True)
-        ema2 = cython_ema(ema1, timeperiod, normalize=False, n_values=n_values)
+        ema1 = ema(input_array, timeperiod, normalize=True)
+        ema2 = ema(ema1, timeperiod, normalize=False, n_values=n_values)
         del ema1
     del input_array
     return ema2
 
 
 
-def ema3(np.ndarray[np.float32_t, ndim=1] input_array, int timeperiod, bint input_is_ema2=False, input_is_ema1=False, int n_values=999999999):
+def ema3(np.ndarray[np.float32_t, ndim=1] input_array = None, int timeperiod = 1, bint input_is_ema2=False, input_is_ema1=False, int n_values=999999999):
     """
     Calculate the third-level Exponential Moving Average (EMA3) over a specified time period.
 
@@ -450,23 +450,23 @@ def ema3(np.ndarray[np.float32_t, ndim=1] input_array, int timeperiod, bint inpu
     """
     cdef np.ndarray[np.float32_t, ndim=1] ema1, ema2, ema3
     if input_is_ema2:
-        ema3 = cython_ema(input_array, timeperiod, normalize=False, n_values=n_values)
+        ema3 = ema(input_array, timeperiod, normalize=False, n_values=n_values)
     elif input_is_ema1:
-        ema2 = cython_ema(input_array, timeperiod, normalize=False)
-        ema3 = cython_ema(ema2, timeperiod, normalize=False, n_values=n_values)
+        ema2 = ema(input_array, timeperiod, normalize=False)
+        ema3 = ema(ema2, timeperiod, normalize=False, n_values=n_values)
         del ema2
     else:
-        ema1 = cython_ema(input_array, timeperiod, normalize=True)
-        ema2 = cython_ema(ema1, timeperiod, normalize=False)
+        ema1 = ema(input_array, timeperiod, normalize=True)
+        ema2 = ema(ema1, timeperiod, normalize=False)
         del ema1
-        ema3 = cython_ema(ema2, timeperiod, normalize=False, n_values=n_values)
+        ema3 = ema(ema2, timeperiod, normalize=False, n_values=n_values)
         del ema2
     del input_array
     return ema3
 
 
 
-def dema(np.ndarray[np.float32_t, ndim=1] input1, np.ndarray[np.float32_t, ndim=1] input2=None, int timeperiod=1, bint input1_is_ema1=False, bint input2_is_ema2=False, int n_values = 999999999):
+def dema(np.ndarray[np.float32_t, ndim=1] input1 = None, np.ndarray[np.float32_t, ndim=1] input2=None, int timeperiod=1, bint input1_is_ema1=False, bint input2_is_ema2=False, int n_values = 999999999):
     """
     Calculate the Double Exponential Moving Average (DEMA) over a specified time period.
 
@@ -506,7 +506,7 @@ def dema(np.ndarray[np.float32_t, ndim=1] input1, np.ndarray[np.float32_t, ndim=
       where EMA1 is the single exponential moving average, and EMA2 is the EMA of EMA1.
     - The function provides flexibility:
         - If `input1_is_ema1` and `input2_is_ema2` are True, no additional EMA calculations are performed.
-        - If only `input1_is_ema1` is True, the second EMA is calculated using `cython_ema`.
+        - If only `input1_is_ema1` is True, the second EMA is calculated using `ema`.
         - If neither flag is set, both EMAs are calculated starting from `input1`.
     - Initial values required for each EMA calculation result in NaN values at the start of the array.
     """    
@@ -518,20 +518,20 @@ def dema(np.ndarray[np.float32_t, ndim=1] input1, np.ndarray[np.float32_t, ndim=
         ema2 = input2
     elif input1_is_ema1 and not input2_is_ema2:
         ema1 = input1
-        ema2 = cython_ema(ema1, timeperiod, normalize=False, n_values=n_values)
+        ema2 = ema(ema1, timeperiod, normalize=False, n_values=n_values)
     elif not input1_is_ema1 and input2_is_ema2:
-        ema1 = cython_ema(input1, timeperiod, normalize=True, n_values=n_values)
+        ema1 = ema(input1, timeperiod, normalize=True, n_values=n_values)
         ema2 = input2
     else:
-        ema1 = cython_ema(input1, timeperiod, normalize=True)
-        ema2 = cython_ema(ema1, timeperiod, normalize=False, n_values=n_values)
+        ema1 = ema(input1, timeperiod, normalize=True)
+        ema2 = ema(ema1, timeperiod, normalize=False, n_values=n_values)
     for i in range(k, n):
         dema[i] = 2 * ema1[i] - ema2[i]
     del input1, input2, ema1, ema2
     return dema
 
 
-def tema(np.ndarray[np.float32_t, ndim=1] input1, np.ndarray[np.float32_t, ndim=1] input2=None, np.ndarray[np.float32_t, ndim=1] input3=None, int timeperiod = 1, bint input3_is_ema3=False, bint input2_is_ema2=False, bint input1_is_ema1=False, int n_values=999999999):
+def tema(np.ndarray[np.float32_t, ndim=1] input1 = None, np.ndarray[np.float32_t, ndim=1] input2=None, np.ndarray[np.float32_t, ndim=1] input3=None, int timeperiod = 1, bint input3_is_ema3=False, bint input2_is_ema2=False, bint input1_is_ema1=False, int n_values=999999999):
     """
     Calculate the Triple Exponential Moving Average (TEMA) over a specified time period.
 
@@ -593,31 +593,31 @@ def tema(np.ndarray[np.float32_t, ndim=1] input1, np.ndarray[np.float32_t, ndim=
     elif input1_is_ema1 and input2_is_ema2 and not input3_is_ema3:
         ema1 = input1
         ema2 = input2
-        ema3 = cython_ema(ema2, timeperiod, normalize=False, n_values=n_values)
+        ema3 = ema(ema2, timeperiod, normalize=False, n_values=n_values)
     elif input1_is_ema1 and not input2_is_ema2 and input3_is_ema3:
         ema1 = input1
-        ema2 = cython_ema(ema1, timeperiod, normalize=False, n_values=n_values)
+        ema2 = ema(ema1, timeperiod, normalize=False, n_values=n_values)
         ema3 = input3
     elif not input1_is_ema1 and input2_is_ema2 and input3_is_ema3:
-        ema1 = cython_ema(input1, timeperiod, normalize=True, n_values=n_values)
+        ema1 = ema(input1, timeperiod, normalize=True, n_values=n_values)
         ema2 = input2
         ema3 = input3
     elif input1_is_ema1 and not input2_is_ema2 and not input3_is_ema3:
         ema1 = input1
-        ema2 = cython_ema(ema1, timeperiod, normalize=False)
-        ema3 = cython_ema(ema2, timeperiod, normalize=False, n_values=n_values)
+        ema2 = ema(ema1, timeperiod, normalize=False)
+        ema3 = ema(ema2, timeperiod, normalize=False, n_values=n_values)
     elif not input1_is_ema1 and input2_is_ema2 and not input3_is_ema3:
-        ema1 = cython_ema(input1, timeperiod, normalize=True, n_values=n_values)
+        ema1 = ema(input1, timeperiod, normalize=True, n_values=n_values)
         ema2 = input2
-        ema3 = cython_ema(ema2, timeperiod, normalize=False, n_values=n_values)
+        ema3 = ema(ema2, timeperiod, normalize=False, n_values=n_values)
     elif not input1_is_ema1 and not input2_is_ema2 and input3_is_ema3:
-        ema1 = cython_ema(input1, timeperiod, normalize=True)
-        ema2 = cython_ema(ema1, timeperiod, normalize=False, n_values=n_values)
+        ema1 = ema(input1, timeperiod, normalize=True)
+        ema2 = ema(ema1, timeperiod, normalize=False, n_values=n_values)
         ema3 = input3
     else:
-        ema1 = cython_ema(input1, timeperiod, normalize=True)
-        ema2 = cython_ema(ema1, timeperiod, normalize=False)
-        ema3 = cython_ema(ema2, timeperiod, normalize=False, n_values=n_values)
+        ema1 = ema(input1, timeperiod, normalize=True)
+        ema2 = ema(ema1, timeperiod, normalize=False)
+        ema3 = ema(ema2, timeperiod, normalize=False, n_values=n_values)
     for i in range(k, n):
         tema[i] = 3 * ema1[i] - 3 * ema2[i] + ema3[i]
     del ema1, ema2, ema3, input1, input2, input3
@@ -625,7 +625,7 @@ def tema(np.ndarray[np.float32_t, ndim=1] input1, np.ndarray[np.float32_t, ndim=
 
 
   
-def trix(np.ndarray[np.float32_t, ndim=1] arr, int timeperiod = 1, bint input_is_ema3 = False, bint input_is_ema2=False, bint input_is_ema1=False, int n_values = 999999999):
+def trix(np.ndarray[np.float32_t, ndim=1] arr = None, int timeperiod = 1, bint input_is_ema3 = False, bint input_is_ema2=False, bint input_is_ema1=False, int n_values = 999999999):
     """
     Calculate the Triple Exponential Moving Average Oscillator (TRIX) over a specified time period.
 
@@ -676,16 +676,16 @@ def trix(np.ndarray[np.float32_t, ndim=1] arr, int timeperiod = 1, bint input_is
     if input_is_ema3:
         ema3 = arr
     elif input_is_ema2:
-        ema3 = cython_ema(arr, timeperiod, normalize=False, n_values=n_values+1)
+        ema3 = ema(arr, timeperiod, normalize=False, n_values=n_values+1)
     elif input_is_ema1:
-        ema2 = cython_ema(arr, timeperiod, normalize=False)
-        ema3 = cython_ema(ema2, timeperiod, normalize=False, n_values=n_values+1)
+        ema2 = ema(arr, timeperiod, normalize=False)
+        ema3 = ema(ema2, timeperiod, normalize=False, n_values=n_values+1)
         del ema2
     else:
-        ema1 = cython_ema(arr, timeperiod, normalize=True)
-        ema2 = cython_ema(ema1, timeperiod, normalize=False)
+        ema1 = ema(arr, timeperiod, normalize=True)
+        ema2 = ema(ema1, timeperiod, normalize=False)
         del ema1
-        ema3 = cython_ema(ema2, timeperiod, normalize=False, n_values=n_values+1)
+        ema3 = ema(ema2, timeperiod, normalize=False, n_values=n_values+1)
         del ema2
     for i in range(k, n):
         trix[i] = (ema3[i] - ema3[i - 1]) / (ema3[i - 1] + (0 if ema3[i-1]!=0 else 1e-9))
@@ -693,59 +693,74 @@ def trix(np.ndarray[np.float32_t, ndim=1] arr, int timeperiod = 1, bint input_is
     return trix
 
 
+def deriv(np.ndarray[np.float32_t, ndim=1] input_array,
+          int window_size=7,
+          int polyorder=2,
+          int deriv_order=1):
 
-def roc(np.ndarray[np.float32_t, ndim=1] input_array, int timeperiod, int n_values=999999999):
-    """
-    Calculate the Rate of Change (ROC) over a specified time period.
-
-    The ROC is a momentum oscillator that measures the percentage change between the current value 
-    and the value `timeperiod` steps ago. It is used to identify trends and reversals in price movements.
-
-    Parameters:
-    ----------
-    input_array : np.ndarray[np.float32_t, ndim=1]
-        Array of input values (e.g., closing prices) for each time step.
-
-    timeperiod : int
-        The lookback period for calculating the ROC.
-
-    n_values : int, optional
-        Number of values from the end of the input array to calculate. Defaults to a very large number, effectively using all elements.
-
-    Returns:
-    -------
-    np.ndarray[np.float32_t, ndim=1]
-        An array containing the Rate of Change (ROC) values. 
-        Values outside the calculated range remain NaN.
-
-    Notes:
-    -----
-    - The ROC formula is:
-        ROC = (Current Value - Previous Value) / Previous Value
-      where the `Previous Value` is the value `timeperiod` steps earlier.
-    - To handle potential division by zero, a small epsilon (1e-9) is added to the `Previous Value` when it equals zero.
-    - The initial `timeperiod` values are NaN as there is insufficient data to calculate ROC.
-    - The computation is vectorized for efficiency, minimizing the use of explicit loops.
-    """
     cdef int n = len(input_array)
-    cdef int k = max(n - n_values, timeperiod)
-    cdef np.ndarray[np.float32_t, ndim=1] roc = np.full(n, np.nan, dtype=np.float32)
+    cdef np.ndarray[np.float32_t, ndim=1] result = np.full(n, np.nan, dtype=np.float32)
+    cdef int i, j, k
 
-    # Vectorized computation for indices from k to n
-    if k < n:
-        # Extract the relevant slices
-        current_values = input_array[k:]
-        previous_values = input_array[k - timeperiod:n - timeperiod]
-        
-        # Compute ROC using NumPy's vectorized operations
-        prev_nonzero = np.where(previous_values != 0, previous_values, 1e-9)
-        roc[k:] = (input_array[k:] - previous_values) / prev_nonzero
+    # Ensure constraints
+    if window_size % 2 == 0 or polyorder < deriv_order or window_size <= polyorder:
+        raise ValueError("Invalid window_size or polyorder")
 
-    return roc
+    # Build the Vandermonde matrix X for each window [0, 1, ..., window_size - 1]
+    cdef int W = window_size
+    cdef np.ndarray[np.float64_t, ndim=2] X = np.zeros((W, polyorder + 1), dtype=np.float64)
+    cdef np.ndarray[np.float64_t, ndim=2] XtX_inv = np.zeros((polyorder + 1, polyorder + 1), dtype=np.float64)
+    cdef np.ndarray[np.float64_t, ndim=2] Xt = np.zeros((polyorder + 1, W), dtype=np.float64)
+    cdef np.ndarray[np.float64_t, ndim=1] coeffs = np.zeros(polyorder + 1, dtype=np.float64)
+    cdef np.ndarray[np.float64_t, ndim=1] window = np.zeros(W, dtype=np.float64)
+
+    for i in range(W):
+        for j in range(polyorder + 1):
+            X[i, j] = pow(i, j)
+
+    # Precompute (XᵀX)⁻¹ Xᵀ
+    Xt = X.T.copy()
+    XtX_inv = np.linalg.pinv(X.T @ X) @ Xt  # shape: (polyorder+1, window_size)
+
+    # Compute factorial for scaling derivative
+    cdef double factorial = 1.0
+    for i in range(1, deriv_order + 1):
+        factorial *= i
+
+    # Final convolution kernel: derivative_coeffs[i] = coeff of i-th input in the window
+    cdef np.ndarray[np.float64_t, ndim=1] deriv_kernel = np.zeros(W, dtype=np.float64)
+    for k in range(W):
+        deriv_kernel[k] = XtX_inv[deriv_order, k] * factorial
+
+    # Apply filter over input_array
+    for i in range(W - 1, n):
+        for j in range(W):
+            window[j] = input_array[i - W + 1 + j]
+        if np.isnan(window).any():
+            continue
+        result[i] = np.dot(deriv_kernel, window)
+
+    return result.astype(np.float32)
+
+
+
+def roc(np.ndarray[np.float32_t, ndim=1] input_array, int timeperiod=1, int n_values=999999999):
+    cdef Py_ssize_t n = input_array.shape[0]
+    cdef Py_ssize_t k = max(n - n_values, timeperiod)
+    cdef Py_ssize_t i
+
+    cdef np.ndarray[np.float32_t, ndim=1] out = np.full(n, np.nan, dtype=np.float32)
+
+    for i in range(k, n):
+        if input_array[i - timeperiod] != 0:
+            out[i] = (input_array[i] - input_array[i - timeperiod]) / input_array[i - timeperiod]
+        # else: stays NaN
+
+    return out
 
  
 
-def rsi(np.ndarray[np.float32_t, ndim=1] close, int timeperiod, int n_values = 999999999):
+def rsi(np.ndarray[np.float32_t, ndim=1] close = None, int timeperiod = 1, int n_values = 999999999):
     """
     Calculate the Relative Strength Index (RSI) over a specified time period.
 
@@ -807,7 +822,7 @@ def rsi(np.ndarray[np.float32_t, ndim=1] close, int timeperiod, int n_values = 9
 
 
 
-def willr(np.ndarray[np.float32_t, ndim=1] high_arr, np.ndarray[np.float32_t, ndim=1] low_arr, np.ndarray[np.float32_t, ndim=1] close_arr, int timeperiod, int n_values = 999999999):
+def willr(np.ndarray[np.float32_t, ndim=1] high_arr = None, np.ndarray[np.float32_t, ndim=1] low_arr = None, np.ndarray[np.float32_t, ndim=1] close_arr = None, int timeperiod = 1, int n_values = 999999999):
     """
     Calculate the Williams %R (WILLR) over a specified time period.
 
@@ -888,7 +903,7 @@ def willr(np.ndarray[np.float32_t, ndim=1] high_arr, np.ndarray[np.float32_t, nd
 
 
 
-def cci(np.ndarray[np.float32_t, ndim=1] high_arr, np.ndarray[np.float32_t, ndim=1] low_arr, np.ndarray[np.float32_t, ndim=1] close_arr, int timeperiod, int n_values = 999999999):
+def cci(np.ndarray[np.float32_t, ndim=1] high_arr = None, np.ndarray[np.float32_t, ndim=1] low_arr = None, np.ndarray[np.float32_t, ndim=1] close_arr = None, int timeperiod = 1, int n_values = 999999999):
     """
     Calculate the Commodity Channel Index (CCI) using a mean squared deviation for faster execution.
 
@@ -957,7 +972,7 @@ def cci(np.ndarray[np.float32_t, ndim=1] high_arr, np.ndarray[np.float32_t, ndim
     return cci
 
 
-def dx(np.ndarray[np.float32_t, ndim=1] high, np.ndarray[np.float32_t, ndim=1] low, np.ndarray[np.float32_t, ndim=1] close, int timeperiod, int n_values = 999999999):
+def dx(np.ndarray[np.float32_t, ndim=1] high = None, np.ndarray[np.float32_t, ndim=1] low = None, np.ndarray[np.float32_t, ndim=1] close = None, int timeperiod = 1, int n_values = 999999999):
     """
     Calculate the Directional Movement Index (DX) over a specified time period.
 
@@ -1085,7 +1100,7 @@ def adx(np.ndarray[np.float32_t, ndim=1] high_arr = None, np.ndarray[np.float32_
 
     close_arr_is_dx : bint, optional
         If True, the `close_arr` input is treated as precomputed DX values. 
-        If False, the DX will be calculated internally using `cython_dx`.
+        If False, the DX will be calculated internally using `dx`.
         Defaults to False.
 
     Returns:
@@ -1099,25 +1114,31 @@ def adx(np.ndarray[np.float32_t, ndim=1] high_arr = None, np.ndarray[np.float32_
     - The DX (Directional Movement Index) measures the percentage difference between 
       the positive and negative directional movements.
     - The ADX is a smoothed average of DX values, calculated using an exponential moving average.
-    - If `close_arr_is_dx` is False, the DX values are calculated internally using the `cython_dx` function.
+    - If `close_arr_is_dx` is False, the DX values are calculated internally using the `dx` function.
     - The initial `2 * timeperiod` values are required for the calculation, so values before this offset remain NaN.
     """
     cdef int n = len(close_arr), i
     k = max(2 * timeperiod, n - n_values)
     cdef np.ndarray[np.float32_t, ndim=1] adx = np.full(n, np.nan, dtype=np.float32)
-    cdef np.ndarray[np.float32_t, ndim=1] dx = close_arr if close_arr_is_dx else cython_dx(high_arr, low_arr, close_arr, timeperiod)
+    cdef np.ndarray[np.float32_t, ndim=1] dx_arr = close_arr if close_arr_is_dx else dx(high_arr, low_arr, close_arr, timeperiod)
     cdef float adx_value    
-    adx_value = np.nanmean(dx[timeperiod:2 * timeperiod])
+
+
+    ### this line is causing an error
+    adx_value = np.nanmean(dx_arr[timeperiod:2 * timeperiod])
+
+
+
     for i in range(2 * timeperiod, k):
-        adx_value = ((adx_value * (timeperiod - 1)) + dx[i]) / timeperiod
+        adx_value = ((adx_value * (timeperiod - 1)) + dx_arr[i]) / timeperiod
     for i in range(k, n):
-        adx_value = ((adx_value * (timeperiod - 1)) + dx[i]) / timeperiod
+        adx_value = ((adx_value * (timeperiod - 1)) + dx_arr[i]) / timeperiod
         adx[i] = adx_value
-    del dx, high_arr, low_arr, close_arr
+    del dx_arr, high_arr, low_arr, close_arr
     return adx
 
  
-def adxr(np.ndarray[np.float32_t, ndim=1] high_arr, np.ndarray[np.float32_t, ndim=1] low_arr, np.ndarray[np.float32_t, ndim=1] close_arr, int timeperiod, int n_values = 999999999, bint close_arr_is_adx=False):
+def adxr(np.ndarray[np.float32_t, ndim=1] high_arr = None, np.ndarray[np.float32_t, ndim=1] low_arr = None, np.ndarray[np.float32_t, ndim=1] close_arr = None, int timeperiod = 1, int n_values = 999999999, bint close_arr_is_adx=False):
     """
     Calculate the Average Directional Movement Rating (ADXR) over a specified time period.
 
@@ -1144,7 +1165,7 @@ def adxr(np.ndarray[np.float32_t, ndim=1] high_arr, np.ndarray[np.float32_t, ndi
 
     close_arr_is_adx : bint, optional
         If True, the `close_arr` input is treated as precomputed ADX values. 
-        If False, the ADX will be computed internally using `cython_adx`.
+        If False, the ADX will be computed internally using `adx`.
         Defaults to False.
 
     Returns:
@@ -1158,20 +1179,20 @@ def adxr(np.ndarray[np.float32_t, ndim=1] high_arr, np.ndarray[np.float32_t, ndi
     - ADXR is calculated as:
         ADXR[i] = (ADX[i] + ADX[i - timeperiod]) / 2
       where ADX is the Average Directional Index.
-    - If `close_arr_is_adx` is False, the ADX values are calculated internally using the `cython_adx` function.
+    - If `close_arr_is_adx` is False, the ADX values are calculated internally using the `adx` function.
     - A `timeperiod` offset is required for valid ADXR calculations, so initial values will remain NaN.
     """
     cdef int n = len(close_arr), i
     cdef int k = max(timeperiod, n - n_values)
-    cdef np.ndarray[np.float32_t, ndim=1] adx = close_arr if close_arr_is_adx else cython_adx(high_arr, low_arr, close_arr, timeperiod)
+    cdef np.ndarray[np.float32_t, ndim=1] adx_array = close_arr if close_arr_is_adx else adx(high_arr, low_arr, close_arr, timeperiod)
     cdef np.ndarray[np.float32_t, ndim=1] adxr = np.full(n, np.nan, dtype=np.float32)
     for i in range(k - timeperiod, n - timeperiod):
-        adxr[i + timeperiod] = (adx[i] + adx[i + timeperiod]) / 2
-    del adx, high_arr, low_arr, close_arr
+        adxr[i + timeperiod] = (adx_array[i] + adx_array[i + timeperiod]) / 2
+    del adx_array, high_arr, low_arr, close_arr
     return adxr
 
 
-def cmo(np.ndarray[np.float32_t, ndim=1] close_arr, int timeperiod, int n_values = 999999999):
+def cmo(np.ndarray[np.float32_t, ndim=1] close_arr = None, int timeperiod = 1, int n_values = 999999999):
     """
     Calculate the Chande Momentum Oscillator (CMO) over a specified time period.
 
@@ -1232,7 +1253,7 @@ def cmo(np.ndarray[np.float32_t, ndim=1] close_arr, int timeperiod, int n_values
     return cmo
 
 
-def natr(np.ndarray[np.float32_t, ndim=1] high_arr, np.ndarray[np.float32_t, ndim=1] low_arr, np.ndarray[np.float32_t, ndim=1] close_arr, int timeperiod, int n_values = 999999999):
+def natr(np.ndarray[np.float32_t, ndim=1] high_arr = None, np.ndarray[np.float32_t, ndim=1] low_arr = None, np.ndarray[np.float32_t, ndim=1] close_arr = None, int timeperiod = 1, int n_values = 999999999):
     """
     Calculate the Normalized Average True Range (NATR) over a specified time period.
 
@@ -1294,7 +1315,7 @@ def natr(np.ndarray[np.float32_t, ndim=1] high_arr, np.ndarray[np.float32_t, ndi
     return natr
 
  
-def ult(np.ndarray[np.float32_t, ndim=1] high_arr, np.ndarray[np.float32_t, ndim=1] low_arr, np.ndarray[np.float32_t, ndim=1] close_arr, int short_period, int medium_period, int long_period, int n_values = 999999999):
+def ult(np.ndarray[np.float32_t, ndim=1] high_arr = None, np.ndarray[np.float32_t, ndim=1] low_arr = None, np.ndarray[np.float32_t, ndim=1] close_arr = None, int short_period = 1, int medium_period = 2, int long_period = 4, int n_values = 999999999):
     """
     Calculate the Ultimate Oscillator (UO) over three specified time periods.
 
@@ -1338,12 +1359,12 @@ def ult(np.ndarray[np.float32_t, ndim=1] high_arr, np.ndarray[np.float32_t, ndim
       and the previous close, and the minimum of the current low and the previous close.
     - The Ultimate Oscillator combines the weighted average of BP/TR ratios for the short, 
       medium, and long time periods.
-    - A small epsilon (1e-10) is added to the denominator if the True Range (TR) is zero to prevent division errors.
+    - A small epsilon (1e-9) is added to the denominator if the True Range (TR) is zero to prevent division errors.
     """
     cdef int n = len(close_arr), i
     cdef int k = max(long_period, n - n_values)
     cdef np.ndarray[np.float32_t, ndim=1] uo = np.full(n, np.nan, dtype=np.float32)
-    cdef float sum_bp_short = 0.0, sum_tr_short = 0.0, sum_bp_medium = 0.0, sum_tr_medium = 0.0, sum_bp_long = 0.0, sum_tr_long = 0.0, eps = 1e-10
+    cdef float sum_bp_short = 0.0, sum_tr_short = 0.0, sum_bp_medium = 0.0, sum_tr_medium = 0.0, sum_bp_long = 0.0, sum_tr_long = 0.0, eps = 1e-9
     cdef float bp, tr
     for i in range(k - long_period, k):
         bp = close_arr[i] - min(low_arr[i], close_arr[i - 1])
@@ -1373,7 +1394,7 @@ def ult(np.ndarray[np.float32_t, ndim=1] high_arr, np.ndarray[np.float32_t, ndim
     return uo
 
 
-def stochf(np.ndarray[np.float32_t, ndim=1] high_arr, np.ndarray[np.float32_t, ndim=1] low_arr, np.ndarray[np.float32_t, ndim=1] close_arr, int timeperiod, int n_values = 999999999):
+def stochf(np.ndarray[np.float32_t, ndim=1] high_arr = None, np.ndarray[np.float32_t, ndim=1] low_arr = None, np.ndarray[np.float32_t, ndim=1] close_arr = None, int timeperiod = 1, int n_values = 999999999):
     """
     Calculate the Stochastic Fast %K indicator over a specified time period.
 
@@ -1457,7 +1478,7 @@ def stochf(np.ndarray[np.float32_t, ndim=1] high_arr, np.ndarray[np.float32_t, n
     return stochf_k
 
 
-def net_wick(np.ndarray[np.float32_t, ndim=1] high_arr, np.ndarray[np.float32_t, ndim=1] low_arr, np.ndarray[np.float32_t, ndim=1] close_arr, int timeperiod, int n_values = 999999999):
+def net_wick(np.ndarray[np.float32_t, ndim=1] high_arr = None, np.ndarray[np.float32_t, ndim=1] low_arr = None, np.ndarray[np.float32_t, ndim=1] close_arr = None, int timeperiod = 1, int n_values = 999999999):
     """
     Calculate the net wick of candlesticks over a given time period.
 
@@ -1599,20 +1620,117 @@ def macd(np.ndarray[np.float32_t, ndim=1] input0=None, np.ndarray[np.float32_t, 
         for i in range(k, n):
             macd[i] = input1[i] - input2[i]
     elif input1_is_fast_ema and not input2_is_slow_ema:
-        slow_ema = cython_ema(input0, timeperiod=long_period, n_values=n_values)
+        slow_ema = ema(input0, timeperiod=long_period, n_values=n_values)
         for i in range(k, n):
             macd[i] = input1[i] - slow_ema[i]
         del slow_ema
     elif not input1_is_fast_ema and input2_is_slow_ema:
-        fast_ema = cython_ema(input0, timeperiod=short_period, n_values=n_values)
+        fast_ema = ema(input0, timeperiod=short_period, n_values=n_values)
         for i in range(k, n):
             macd[i] = fast_ema[i] - input2[i]   
         del fast_ema     
     else:
-        fast_ema = cython_ema(input0, timeperiod=short_period, n_values=n_values)
-        slow_ema = cython_ema(input0, timeperiod=long_period, n_values=n_values)
+        fast_ema = ema(input0, timeperiod=short_period, n_values=n_values)
+        slow_ema = ema(input0, timeperiod=long_period, n_values=n_values)
         for i in range(k, n):
             macd[i] = fast_ema[i] - slow_ema[i]
         del fast_ema, slow_ema
     del input0, input1, input2
     return macd
+
+##################################### volume indicators ##
+
+def obv(np.ndarray[np.float32_t, ndim=1] close, np.ndarray[np.float32_t, ndim=1] volume):
+    cdef int n = len(close), i
+    cdef np.ndarray[np.float32_t, ndim=1] obv_vals = np.zeros(n, dtype=np.float32)
+    for i in range(1, n):
+        if close[i] > close[i-1]:
+            obv_vals[i] = obv_vals[i-1] + volume[i]
+        elif close[i] < close[i-1]:
+            obv_vals[i] = obv_vals[i-1] - volume[i]
+        else:
+            obv_vals[i] = obv_vals[i-1]
+    return obv_vals
+
+def vwap(np.ndarray[np.float32_t, ndim=1] close, np.ndarray[np.float32_t, ndim=1] volume):
+    cdef int n = len(close), i
+    cdef np.ndarray[np.float32_t, ndim=1] vwap_vals = np.zeros(n, dtype=np.float32)
+    cdef float cum_vol = 0.0, cum_vol_price = 0.0
+    for i in range(n):
+        cum_vol += volume[i]
+        cum_vol_price += close[i] * volume[i]
+        if cum_vol > 0:
+            vwap_vals[i] = cum_vol_price / cum_vol
+    return vwap_vals
+
+def mfi(np.ndarray[np.float32_t, ndim=1] high, np.ndarray[np.float32_t, ndim=1] low,
+        np.ndarray[np.float32_t, ndim=1] close, np.ndarray[np.float32_t, ndim=1] volume, int period=14):
+    cdef int n = len(close), i
+    cdef np.ndarray[np.float32_t, ndim=1] money_flow = np.zeros(n, dtype=np.float32)
+    cdef np.ndarray[np.float32_t, ndim=1] mfi_vals = np.full(n, np.nan, dtype=np.float32)
+    cdef float typical_price, pos_flow, neg_flow
+    
+    for i in range(n):
+        typical_price = (high[i] + low[i] + close[i]) / 3
+        money_flow[i] = typical_price * volume[i]
+    
+    for i in range(period, n):
+        pos_flow = np.sum(money_flow[i-period:i][close[i-period:i] > close[i-period-1:i-1]])
+        neg_flow = np.sum(money_flow[i-period:i][close[i-period:i] < close[i-period-1:i-1]])
+        if neg_flow == 0:
+            mfi_vals[i] = 100
+        else:
+            mfi_vals[i] = 100 - (100 / (1 + (pos_flow / neg_flow)))
+    return mfi_vals
+
+def ad_line(np.ndarray[np.float32_t, ndim=1] high, np.ndarray[np.float32_t, ndim=1] low,
+            np.ndarray[np.float32_t, ndim=1] close, np.ndarray[np.float32_t, ndim=1] volume):
+    cdef int n = len(close), i
+    cdef np.ndarray[np.float32_t, ndim=1] ad_vals = np.zeros(n, dtype=np.float32)
+    cdef float money_flow_multiplier
+    
+    for i in range(n):
+        if high[i] != low[i]:
+            money_flow_multiplier = ((close[i] - low[i]) - (high[i] - close[i])) / (high[i] - low[i])
+            ad_vals[i] = ad_vals[i-1] + money_flow_multiplier * volume[i]
+    return ad_vals
+
+def cmf(np.ndarray[np.float32_t, ndim=1] high, np.ndarray[np.float32_t, ndim=1] low,
+        np.ndarray[np.float32_t, ndim=1] close, np.ndarray[np.float32_t, ndim=1] volume, int period=20):
+    cdef int n = len(close), i
+    cdef np.ndarray[np.float32_t, ndim=1] cmf_vals = np.full(n, np.nan, dtype=np.float32)
+    cdef float money_flow_multiplier, money_flow_volume, sum_mfv, sum_volume
+    
+    for i in range(period, n):
+        sum_mfv = 0.0
+        sum_volume = 0.0
+        for j in range(i - period, i):
+            if high[j] != low[j]:
+                money_flow_multiplier = ((close[j] - low[j]) - (high[j] - close[j])) / (high[j] - low[j])
+                money_flow_volume = money_flow_multiplier * volume[j]
+                sum_mfv += money_flow_volume
+                sum_volume += volume[j]
+        if sum_volume != 0:
+            cmf_vals[i] = sum_mfv / sum_volume
+    return cmf_vals
+
+def pvt(np.ndarray[np.float32_t, ndim=1] close, np.ndarray[np.float32_t, ndim=1] volume):
+    cdef int n = len(close), i
+    cdef np.ndarray[np.float32_t, ndim=1] pvt_vals = np.zeros(n, dtype=np.float32)
+    
+    for i in range(1, n):
+        if close[i-1] != 0:
+            pvt_vals[i] = pvt_vals[i-1] + (volume[i] * (close[i] - close[i-1]) / close[i-1])
+    return pvt_vals
+
+def volume_oscillator(np.ndarray[np.float32_t, ndim=1] volume, int short_period=5, int long_period=10):
+    cdef int n = len(volume), i
+    cdef np.ndarray[np.float32_t, ndim=1] vo_vals = np.full(n, np.nan, dtype=np.float32)
+    cdef float short_ma, long_ma
+    
+    for i in range(long_period, n):
+        short_ma = np.mean(volume[i-short_period:i])
+        long_ma = np.mean(volume[i-long_period:i])
+        if long_ma != 0:
+            vo_vals[i] = ((short_ma - long_ma) / long_ma) * 100
+    return vo_vals
